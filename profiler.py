@@ -122,12 +122,8 @@ class ProfilerState:
     def __init__(self) -> None:
         self.completed_trace_events: list[TraceEvent] = []
     
-    def trace_event_callback(self, cpu, data, size) -> None:
-        pass
-
     def completed_stack_callback(self, cpu, data, size) -> None:
         event = ctypes.cast(data, ctypes.POINTER(CompletedStackEvent)).contents
-        print(f"Completed stack event received: {event}")
         trace_event = TraceEvent(
             ts=event.ts_us,
             pid=event.pid,
@@ -137,10 +133,6 @@ class ProfilerState:
             stack=event.func_names_parsed
         )
         self.completed_trace_events.append(trace_event)
-
-    def debug_callback(self, cpu, data, size) -> None:
-        event = ctypes.cast(data, ctypes.POINTER(CompletedStackEvent)).contents
-        print(f"Debug event received: {event}")
 
     def write_trace_events_to_file(self, file_path: str) -> None:
         with open(file_path, "w") as f:
@@ -181,7 +173,6 @@ def main():
     profiler_state = ProfilerState()
 
     # Attach the event handler
-    bpf["trace_events"].open_perf_buffer(profiler_state.trace_event_callback)
     bpf["completed_stacks"].open_perf_buffer(profiler_state.completed_stack_callback)
     print(f"Profiling method calls in Python processes {args.pids}... Ctrl-C to stop.")
 

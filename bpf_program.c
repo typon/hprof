@@ -83,9 +83,6 @@ int trace_entry(struct pt_regs *ctx) {
         stack->depth = depth + 1;
     }
 
-    data->depth = stack->depth;
-    data->is_return = 0;
-    trace_events.perf_submit(ctx, data, sizeof(*data));
     return 0;
 }
 
