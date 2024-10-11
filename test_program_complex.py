@@ -24,8 +24,13 @@ def child_function(duration_s: float) -> None:
 
 
 def parent_function(duration_s: float) -> None:
-    child_function(duration_s)
     time.sleep(duration_s)
+    if random.random() < 0.5:
+        child_function(duration_s)
+        child_function(duration_s)
+        return
+    child_function(duration_s)
+    return
 
 
 def worker_thread(thread_id: int) -> None:

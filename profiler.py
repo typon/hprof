@@ -24,6 +24,7 @@ class FunctionTraceEvent(ctypes.Structure):
         ("is_return", ctypes.c_ulonglong),
         ("file_name", ctypes.c_char * MAX_FUNC_NAME_LEN),
         ("func_name", ctypes.c_char * MAX_FUNC_NAME_LEN),
+        ("lineno", ctypes.c_int),
     ]
 
 
@@ -34,6 +35,8 @@ class CompletedStackEvent(ctypes.Structure):
         ("tid", ctypes.c_ulonglong),
         ("duration", ctypes.c_ulonglong),
         ("depth", ctypes.c_ulonglong),
+        ("entry_lineno", ctypes.c_int),
+        ("return_lineno", ctypes.c_int),
         ("file_name", ctypes.c_char * MAX_FUNC_NAME_LEN),
         ("func_name", ctypes.c_char * MAX_FUNC_NAME_LEN),
         ("func_names", (ctypes.c_char * MAX_FUNC_NAME_LEN) * MAX_STACK_DEPTH),
@@ -81,15 +84,6 @@ class CompletedStackEvent(ctypes.Structure):
             f"CompletedStackEvent(ts={self.ts}, pid={self.pid}, tid={self.tid}, "
             f"duration(us)={self.duration / 1e3}, depth={self.depth}, func_name={self.func_name}, func_names={self.func_names_parsed})"
         )
-
-
-class DebugEvent(ctypes.Structure):
-    _fields_ = [
-        ("ts", ctypes.c_ulonglong),
-        ("pid", ctypes.c_ulonglong),
-        ("tid", ctypes.c_ulonglong),
-        ("depth", ctypes.c_int),
-    ]
 
 
 @dataclass
@@ -143,7 +137,7 @@ class ProfilerState:
             pid=event.pid,
             tid=event.tid_short,
             duration=event.duration_us,
-            name=f"{event.file_name_parsed}:{event.func_name_parsed}",
+            name=f"{event.file_name_parsed}:{event.entry_lineno}-{event.return_lineno}:{event.func_name_parsed}",
             stack=event.func_names_parsed,
         )
         self.completed_trace_events.append(trace_event)
@@ -151,10 +145,12 @@ class ProfilerState:
     def write_trace_events_to_file(self, file_path: str) -> None:
         with open(file_path, "w") as f:
             json.dump(
-                [
-                    event.serialize_to_chrome_trace_event()
-                    for event in self.completed_trace_events
-                ],
+                {
+                    "traceEvents": [
+                        event.serialize_to_chrome_trace_event()
+                        for event in self.completed_trace_events
+                    ]
+                },
                 f,
                 indent=4,
             )
@@ -258,7 +254,7 @@ def main():
 
     # Attach the event handler
     bpf["completed_stacks"].open_perf_buffer(profiler_state.completed_stack_callback)
-    print(f"Profiling method calls in Python processes {args.pids}... Ctrl-C to stop.")
+    print(f"Profiling method calls in Python processes {config.pids}... Ctrl-C to stop.")
 
     try:
         while True:
@@ -267,7 +263,7 @@ def main():
         # Optionally handle graceful shutdown and data persistence
         profiler_state.write_trace_events_to_file(args.trace_file)
         print(
-            f"\nProfiling stopped. {len(profiler_state.completed_trace_events)} trace events have been written to {args.trace_file}."
+            f"\nProfiling stopped. {len(profiler_state.completed_trace_events)} trace events have been written to {args.trace_file}"
         )
 
 
